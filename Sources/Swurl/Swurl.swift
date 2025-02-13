@@ -17,12 +17,28 @@ struct Swurl: AsyncParsableCommand {
     @Flag(name: .shortAndLong, help: "Enable verbose output.") 
     var verbose: Bool = false
 
+    @Flag(name: .shortAndLong, help: "Enable interactive mode.")
+    var interactive: Bool = false
+
     static func main() async throws {
-        let command = Self.parseOrExit()
-        try await command.runAsync()
+        let command: Swurl = Self.parseOrExit()
+        if command.interactive {
+            while true {
+                print("Enter a URL (or type 'exit' to quit): ", terminator: "")
+                guard let input = readLine(), !input.isEmpty else {
+                    continue
+                }
+                if input.lowercased() == "exit" {
+                    break
+                }
+            }
+        } else {
+            try await command.runAsync()
+        }
     }
 
     func runAsync() async throws {
+
         let client: AsyncHTTPClient = AsyncHTTPClient()
         defer {
             client.shutdown()
@@ -41,9 +57,11 @@ struct Swurl: AsyncParsableCommand {
                         return (url: "\(url)", response: "\(jsonString)")
                     } else {
                         print("Failed to convert response body to string for URL: \(url)")
+                        throw SwurlError.failed(url: url, error: "Failed to convert response body to string")
                     }
                 } catch {
-                    "Failed to fetch URL: \(url), error: \(error.localizedDescription)")
+                    print("Failed to fetch URL: \(url), error: \(error.localizedDescription)")
+                    throw error
                 }
             }
         }
